@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>YouTube Timestamp &amp; Chapters Exporter</title>
+<meta name="description" content="Snip YouTube timestamps with a hotkey while you watch or edit in YouTube Studio. Name each chapter on the spot and export to description, Markdown/Notion, or CSV." />
+<link rel="canonical" href="https://wizdomglobalsolutionz.github.io/yt-timestamp-exporter/" />
+
+<!-- Open Graph / social previews -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="YouTube Timestamp & Chapters Exporter" />
+<meta property="og:description" content="Snip YouTube timestamps with a hotkey. Name chapters instantly and export to description, Markdown/Notion, or CSV." />
+<meta property="og:image" content="https://wizdomglobalsolutionz.github.io/yt-timestamp-exporter/assets/og-image.png" />
+<meta property="og:url" content="https://wizdomglobalsolutionz.github.io/yt-timestamp-exporter/" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="YouTube Timestamp & Chapters Exporter" />
+<meta name="twitter:description" content="Snip YouTube timestamps with a hotkey. Export to description, Markdown/Notion, or CSV." />
+<meta name="twitter:image" content="https://wizdomglobalsolutionz.github.io/yt-timestamp-exporter/assets/og-image.png" />
+
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png" />
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    --bg: #05070a;
+    --bg-elevated: #0c0f15;
+    --surface: #12161d;
+    --surface-2: #171c24;
+    --border: rgba(255,255,255,0.09);
+    --text: #f3f5f7;
+    --text-muted: #a1a7b0;
+    --text-faint: #6b7178;
+    --accent: #3ea6ff;
+    --accent-deep: #2f6fd1;
+    --accent-soft: rgba(62,166,255,0.14);
+    --warm: #ff9d3d;
+    --warm-soft: rgba(255,157,61,0.14);
+    --good: #59d18a;
+    --display: "Poppins", "Segoe UI", sans-serif;
+    --body: "Inter", "Segoe UI", Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(1000px 620px at 85% -8%, rgba(62,166,255,0.14), transparent 60%),
+      radial-gradient(700px 480px at 0% 100%, rgba(255,157,61,0.08), transparent 60%);
+  }
+
+  a { color: inherit; }
+
+  img { max-width: 100%; display: block; }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding-inline: 20px;
+  }
+
+  /* Nav */
+  header.nav {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(5,7,10,0.82);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-block: 14px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 700; font-size: 15px; }
+  .brand img { width: 30px; height: 30px; border-radius: 8px; }
+  nav.links { display: flex; gap: 26px; font-size: 14px; color: var(--text-muted); }
+  nav.links a:hover { color: var(--text); }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    text-decoration: none;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); color: #06131f; }
+  .btn-primary:hover { background: #63b8ff; }
+  .btn-ghost { background: transparent; border-color: var(--border); color: var(--text); }
+  .btn-ghost:hover { background: var(--surface); }
+
+  /* Hero */
+  .hero {
+    padding-block: 72px 48px;
+    text-align: center;
+  }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+    color: #7dc4ff; margin-bottom: 18px;
+  }
+  .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(32px, 5.4vw, 54px);
+    line-height: 1.14;
+    letter-spacing: -0.6px;
+    max-width: 780px;
+    margin: 0 auto;
+    text-wrap: balance;
+  }
+  h1 span { color: var(--accent); }
+  .hero p.sub {
+    max-width: 560px;
+    margin: 20px auto 0;
+    font-size: 18px;
+    color: var(--text-muted);
+  }
+  .hero-ctas { display: flex; gap: 12px; justify-content: center; margin-top: 30px; flex-wrap: wrap; }
+  .hero-ctas .btn { font-size: 15px; padding: 13px 24px; }
+  .hero-note { margin-top: 14px; font-size: 13px; color: var(--text-faint); }
+
+  .kbd-row { display: flex; gap: 7px; align-items: center; justify-content: center; margin-top: 26px; }
+  .kbd {
+    font-family: var(--mono); font-weight: 500; font-size: 13px;
+    background: var(--surface); border: 1px solid var(--border); border-bottom: 2px solid rgba(255,255,255,0.14);
+    border-radius: 7px; padding: 6px 11px;
+  }
+  .kbd-plus { color: var(--text-faint); font-weight: 700; }
+  .kbd-label { font-size: 13px; color: #7dc4ff; margin-left: 6px; font-weight: 600; }
+
+  .hero-shot {
+    margin: 52px auto 0;
+    max-width: 920px;
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow: 0 40px 90px rgba(0,0,0,0.55);
+  }
+
+  /* Sections */
+  section { padding-block: 64px; }
+  .section-head { text-align: center; max-width: 620px; margin: 0 auto 40px; }
+  h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(26px, 3.4vw, 36px);
+    letter-spacing: -0.4px;
+    text-wrap: balance;
+    margin: 0 0 10px;
+  }
+  h2 span { color: var(--accent); }
+  .section-head p { color: var(--text-muted); font-size: 16px; margin: 0; }
+
+  /* Steps */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 22px;
+  }
+  .step .num {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: var(--accent-soft); color: #7dc4ff;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--display); font-weight: 700; font-size: 15px;
+    margin-bottom: 16px;
+  }
+  .step h3 { font-family: var(--display); font-size: 17px; margin: 0 0 8px; }
+  .step p { color: var(--text-muted); font-size: 14.5px; margin: 0; }
+
+  /* Feature split rows */
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    align-items: center;
+  }
+  .split.reverse .media { order: 2; }
+  .split .copy .eyebrow { margin-bottom: 14px; }
+  .split h2 { text-align: left; }
+  .split p.desc { color: var(--text-muted); font-size: 16px; max-width: 440px; }
+  .split .media img {
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: 0 30px 60px rgba(0,0,0,0.45);
+  }
+  .feature-list { list-style: none; margin: 22px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .feature-list li { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; color: #dfe2e6; }
+  .feature-list .check {
+    width: 20px; height: 20px; border-radius: 50%; background: var(--accent-soft); color: #7dc4ff;
+    display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 2px;
+  }
+
+  /* Pricing */
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+    max-width: 780px;
+    margin: 0 auto;
+  }
+  .plan {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 30px 26px;
+  }
+  .plan-pro { border-color: rgba(255,157,61,0.4); background: linear-gradient(180deg, rgba(255,157,61,0.06), var(--surface) 40%); position: relative; }
+  .plan-badge {
+    position: absolute; top: -12px; right: 24px;
+    background: linear-gradient(135deg,#ffd76b,#ff9d3d); color: #241a00;
+    font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px;
+  }
+  .plan-name { font-family: var(--display); font-weight: 700; font-size: 15px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .plan-price { font-family: var(--display); font-weight: 700; font-size: 40px; margin: 10px 0 4px; }
+  .plan-price span { font-size: 16px; color: var(--text-muted); font-weight: 500; }
+  .plan ul { list-style: none; padding: 0; margin: 22px 0 26px; display: flex; flex-direction: column; gap: 11px; }
+  .plan li { display: flex; gap: 9px; align-items: flex-start; font-size: 14.5px; color: #dfe2e6; }
+  .plan li .icon { flex-shrink: 0; margin-top: 2px; }
+  .plan li.no { color: var(--text-faint); }
+  .plan li .icon.yes { color: var(--good); }
+  .plan li .icon.no { color: var(--text-faint); }
+  .plan .btn { width: 100%; justify-content: center; }
+
+  /* FAQ */
+  .faq { max-width: 760px; margin: 0 auto; }
+  details {
+    border-bottom: 1px solid var(--border);
+    padding-block: 18px;
+  }
+  details summary {
+    cursor: pointer;
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 16px;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::after {
+    content: "+";
+    font-size: 20px;
+    color: var(--accent);
+    flex-shrink: 0;
+    transition: transform 150ms ease;
+  }
+  details[open] summary::after { transform: rotate(45deg); }
+  details p { color: var(--text-muted); font-size: 15px; margin: 12px 0 0; max-width: 640px; }
+
+  /* CTA band */
+  .cta-band {
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 48px 24px;
+    margin-inline: 20px;
+  }
+  .cta-band h2 { margin-bottom: 8px; }
+  .cta-band p { color: var(--text-muted); margin: 0 0 26px; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding-block: 32px;
+    margin-top: 24px;
+  }
+  .footer-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 13px;
+    color: var(--text-faint);
+  }
+  .footer-inner a:hover { color: var(--text-muted); }
+  .footer-links { display: flex; gap: 20px; }
+  .disclaimer { max-width: 1080px; margin: 18px auto 0; padding-inline: 20px; font-size: 12.5px; color: var(--text-faint); text-align: center; }
+
+  @media (max-width: 760px) {
+    nav.links { display: none; }
+    .steps { grid-template-columns: 1fr; }
+    .split, .split.reverse .media { grid-template-columns: 1fr; }
+    .split { grid-template-columns: 1fr; }
+    .split.reverse .media { order: 0; }
+    .pricing-grid { grid-template-columns: 1fr; }
+    .footer-inner { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top">
+      <img src="assets/logo.png" alt="" />
+      Timestamp &amp; Chapters
+    </a>
+    <nav class="links">
+      <a href="#how-it-works">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/abjdpbbfojmgfkadgianlikfkgpcjocc" target="_blank" rel="noopener">Add to Chrome — Free</a>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero wrap">
+    <div class="eyebrow"><span class="dot"></span>For video editors &amp; creators</div>
+    <h1>Chapter your <span>YouTube videos</span> as you watch</h1>
+    <p class="sub">Press a hotkey. Name the chapter. Keep watching. Export the whole list to your description, Notion, or a spreadsheet the second you're done — no more pausing to type timestamps by hand.</p>
+
+    <div class="hero-ctas">
+      <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/abjdpbbfojmgfkadgianlikfkgpcjocc" target="_blank" rel="noopener">Add to Chrome — Free</a>
+      <a class="btn btn-ghost" href="#how-it-works">See how it works</a>
+    </div>
+    <p class="hero-note">Free for up to 5 timestamps per video · Premium unlocks unlimited for $5/mo</p>
+
+    <div class="kbd-row">
+      <span class="kbd">Alt</span><span class="kbd-plus">+</span>
+      <span class="kbd">Shift</span><span class="kbd-plus">+</span>
+      <span class="kbd">T</span>
+      <span class="kbd-label">→ snip this moment</span>
+    </div>
+
+    <div class="hero-shot">
+      <img src="assets/hero.png" alt="The extension's capture overlay appearing over a YouTube video, showing a timestamp and chapter title being saved" />
+    </div>
+  </section>
+
+  <section id="how-it-works" class="wrap">
+    <div class="section-head">
+      <h2>Three steps. Zero pausing to type.</h2>
+      <p>Works on standard YouTube watch pages and inside YouTube Studio's preview player.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <h3>Press your hotkey</h3>
+        <p>Alt+Shift+T by default — or set your own combo on Premium. Works while the video keeps playing.</p>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <h3>Name the chapter</h3>
+        <p>A small box appears next to the player with the exact timestamp already filled in. Type a title, hit Enter.</p>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <h3>Export instantly</h3>
+        <p>Open the toolbar popup and copy your whole list as YouTube description chapters, Markdown, or CSV.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="split">
+      <div class="media">
+        <img src="assets/popup.png" alt="The toolbar popup showing a full list of captured chapters with timestamps and titles" />
+      </div>
+      <div class="copy">
+        <div class="eyebrow"><span class="dot"></span>Your chapter list</div>
+        <h2>Every chapter, <span>one click away</span></h2>
+        <p class="desc">Open the toolbar popup to see everything you've captured for the video you're on — rename, reorder, or delete any entry inline.</p>
+        <ul class="feature-list">
+          <li><span class="check">✓</span>Unlimited timestamps per video on Premium</li>
+          <li><span class="check">✓</span>Rename or delete any entry inline</li>
+          <li><span class="check">✓</span>Fully custom hotkey — pick your own combo</li>
+          <li><span class="check">✓</span>Works across YouTube watch pages and Studio</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="split reverse">
+      <div class="media">
+        <img src="assets/exports.png" alt="Three export format cards: YouTube description, Markdown/Notion, and CSV, each showing real generated output" />
+      </div>
+      <div class="copy">
+        <div class="eyebrow"><span class="dot"></span>Export instantly</div>
+        <h2>One list. <span>Three formats.</span></h2>
+        <p class="desc">Copy straight into your YouTube description, a Notion production doc, or a spreadsheet — no reformatting, no manual retyping.</p>
+        <ul class="feature-list">
+          <li><span class="check">✓</span><strong>Description</strong> — paste in and YouTube turns it into clickable chapters</li>
+          <li><span class="check">✓</span><strong>Markdown/Notion</strong> — drop into show notes or production docs</li>
+          <li><span class="check">✓</span><strong>CSV</strong> — import into a spreadsheet or hand off to an editor</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing" class="wrap">
+    <div class="section-head">
+      <h2>Start free. <span>Upgrade when you need it.</span></h2>
+      <p>No account to create — sign-in and billing are handled entirely by ExtensionPay/Stripe.</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="plan">
+        <div class="plan-name">Free</div>
+        <div class="plan-price">$0</div>
+        <ul>
+          <li><span class="icon yes">✓</span>5 timestamps per video</li>
+          <li><span class="icon yes">✓</span>YouTube description export</li>
+          <li><span class="icon yes">✓</span>Works in YouTube Studio</li>
+          <li class="no"><span class="icon no">–</span>Markdown / Notion export</li>
+          <li class="no"><span class="icon no">–</span>CSV export</li>
+          <li class="no"><span class="icon no">–</span>Custom hotkey</li>
+        </ul>
+        <a class="btn btn-ghost" href="https://chromewebstore.google.com/detail/abjdpbbfojmgfkadgianlikfkgpcjocc" target="_blank" rel="noopener">Add to Chrome</a>
+      </div>
+      <div class="plan plan-pro">
+        <div class="plan-badge">Most popular</div>
+        <div class="plan-name">Premium</div>
+        <div class="plan-price">$5<span>/month</span></div>
+        <ul>
+          <li><span class="icon yes">✓</span>Unlimited timestamps per video</li>
+          <li><span class="icon yes">✓</span>YouTube description export</li>
+          <li><span class="icon yes">✓</span>Markdown / Notion export</li>
+          <li><span class="icon yes">✓</span>CSV export</li>
+          <li><span class="icon yes">✓</span>Fully custom hotkey</li>
+          <li><span class="icon yes">✓</span>Works in YouTube Studio</li>
+        </ul>
+        <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/abjdpbbfojmgfkadgianlikfkgpcjocc" target="_blank" rel="noopener">Add to Chrome</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq" class="wrap">
+    <div class="section-head">
+      <h2>Frequently asked questions</h2>
+    </div>
+    <div class="faq">
+      <details open>
+        <summary>Does this work in YouTube Studio?</summary>
+        <p>Yes. The hotkey and capture overlay work both on standard youtube.com watch pages and on YouTube Studio's video preview/editing player, so you can add chapters during your final review pass before publishing.</p>
+      </details>
+      <details>
+        <summary>Is my data private?</summary>
+        <p>Yes. Every timestamp and setting is stored locally in your own browser (chrome.storage.local) — nothing is uploaded to any server we run. There's no tracking or analytics in the extension. Subscriptions are processed entirely by ExtensionPay/Stripe; we never see your card details. Read the full <a href="https://claude.ai/artifact/WgDZW5mk1vh38RCaQJCzTg" target="_blank" rel="noopener">privacy policy</a>.</p>
+      </details>
+      <details>
+        <summary>Why does my first chapter need to start at 0:00?</summary>
+        <p>That's a YouTube requirement, not ours — YouTube only turns a description's timestamp list into clickable chapters if the first entry starts at 0:00 and you have at least three chapters, each at least 10 seconds apart.</p>
+      </details>
+      <details>
+        <summary>Can I use a different hotkey than Alt+Shift+T?</summary>
+        <p>Yes, on the Premium plan — open the toolbar popup, click "change" next to the hotkey, and press whatever combo you want. Free plan uses the default Alt+Shift+T.</p>
+      </details>
+      <details>
+        <summary>Is this affiliated with YouTube or Google?</summary>
+        <p>No. This is an independent, third-party extension built for video editors and creators. It is not affiliated with, endorsed by, or sponsored by YouTube or Google LLC.</p>
+      </details>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="cta-band">
+      <h2>Stop typing timestamps by hand</h2>
+      <p>Free to install, free for up to 5 chapters a video.</p>
+      <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/abjdpbbfojmgfkadgianlikfkgpcjocc" target="_blank" rel="noopener">Add to Chrome — Free</a>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap footer-inner">
+    <span>© 2026 WizdomGlobalSolutionz</span>
+    <div class="footer-links">
+      <a href="https://chromewebstore.google.com/detail/abjdpbbfojmgfkadgianlikfkgpcjocc" target="_blank" rel="noopener">Chrome Web Store</a>
+      <a href="https://claude.ai/artifact/WgDZW5mk1vh38RCaQJCzTg" target="_blank" rel="noopener">Privacy Policy</a>
+      <a href="mailto:wizdomglobalsolutionz@gmail.com">Contact</a>
+    </div>
+  </div>
+</footer>
+<p class="disclaimer">YouTube Timestamp &amp; Chapters Exporter is an independent tool and is not affiliated with, endorsed by, or sponsored by YouTube or Google LLC.</p>
+
+</body>
+</html>
