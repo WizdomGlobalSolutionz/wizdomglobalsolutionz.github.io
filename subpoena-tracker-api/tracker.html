@@ -548,7 +548,7 @@
           <div class="import-tab-panel active" id="tabSpreadsheet">
             <div class="dropzone" id="spreadsheetDrop">
               <div class="dz-main">Drop a CSV or Excel file here, or click to browse</div>
-              <p>Columns: Case Name, Type, Custodian, Method, Date Sent, Due Date, Notes</p>
+              <p>Columns: Case Name, Type, Custodian, Method, Date Sent, Due Date, Notes<br>Type must be one of: Subpoena, Records request, or Deposition notice</p>
               <input type="file" id="spreadsheetInput" accept=".csv,.xlsx,.xls" />
             </div>
             <span class="template-link" id="downloadTemplateBtn">Download a blank template (.csv)</span>
@@ -959,7 +959,8 @@ window.__initTrackerApp = function () {
     if (!t) return 'Subpoena';
     const exact = REQUEST_TYPES.find(rt => rt.toLowerCase() === t);
     if (exact) return exact;
-    if (t.includes('deposition')) return 'Deposition notice';
+    // "disposition" is a very common typo/confusion for "deposition" — treat it the same.
+    if (t.includes('deposition') || t.includes('disposition')) return 'Deposition notice';
     if (t.includes('record')) return 'Records request';
     if (t.includes('subpoena')) return 'Subpoena';
     return 'Subpoena'; // genuinely unrecognized — safe default
@@ -1088,7 +1089,9 @@ window.__initTrackerApp = function () {
 
   document.getElementById('downloadTemplateBtn').addEventListener('click', () => {
     const csv = 'Case Name,Type,Custodian,Method,Date Sent,Due Date,Notes\n' +
-      'Doe v. Acme Corp,Subpoena,St. Mary\'s Hospital — Records Dept,Certified mail,2026-09-01,2026-09-15,\n';
+      'Doe v. Acme Corp,Subpoena,St. Mary\'s Hospital — Records Dept,Certified mail,2026-09-01,2026-09-15,\n' +
+      'Estate of Jones,Records request,County Clerk,Portal,2026-09-05,2026-09-20,\n' +
+      'Lee v. Insurer Co,Deposition notice,Insurer Legal Dept,Email,2026-09-10,2026-09-18,\n';
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
