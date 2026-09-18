@@ -495,7 +495,7 @@
         </div>
 
         <div id="addPanel">
-          <h3>New subpoena / records request</h3>
+          <h3 id="addPanelTitle">New subpoena / records request</h3>
           <div class="form-grid">
             <div class="form-field">
               <label for="fCase">Case / matter name</label>
@@ -607,6 +607,7 @@ window.__initTrackerApp = function () {
   }
 
   let requests = loadRequests();
+  let editingRequestId = null; // null = adding new; otherwise the id of the request being edited
 
   const reqList = document.getElementById('reqList');
   const emptyState = document.getElementById('emptyState');
@@ -719,6 +720,7 @@ window.__initTrackerApp = function () {
       <div class="req-actions">
         ${status !== 'received' ? `<button class="btn btn-ghost btn-sm" data-action="followup" data-id="${req.id}">Generate follow-up</button>` : ''}
         ${status !== 'received' ? `<button class="btn btn-ghost btn-sm" data-action="receive" data-id="${req.id}">Mark received</button>` : ''}
+        <button class="btn btn-ghost btn-sm" data-action="edit" data-id="${req.id}">Edit</button>
         <button class="btn btn-ghost btn-sm" data-action="delete" data-id="${req.id}">Remove</button>
       </div>
       <div class="followup-box" id="fb-${req.id}">
@@ -750,6 +752,8 @@ window.__initTrackerApp = function () {
       requests = requests.map(r => r.id === id ? { ...r, received: true } : r);
       saveRequests(requests);
       render();
+    } else if (action === 'edit') {
+      openEditForm(id);
     } else if (action === 'delete') {
       requests = requests.filter(r => r.id !== id);
       saveRequests(requests);
@@ -767,11 +771,52 @@ window.__initTrackerApp = function () {
     }
   });
 
+  function clearRequestForm() {
+    ['fCase','fCustodian','fMethod','fSent','fDue','fNotes'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('fType').value = 'Subpoena';
+  }
+
+  function resetToAddMode() {
+    editingRequestId = null;
+    document.getElementById('addPanelTitle').textContent = 'New subpoena / records request';
+    document.getElementById('saveReqBtn').textContent = 'Save request';
+  }
+
+  function openEditForm(id) {
+    const req = requests.find(r => r.id === id);
+    if (!req) return;
+
+    editingRequestId = id;
+    document.getElementById('fCase').value = req.caseName;
+    document.getElementById('fType').value = req.type;
+    document.getElementById('fCustodian').value = req.custodian;
+    document.getElementById('fMethod').value = req.method || '';
+    document.getElementById('fSent').value = req.sent || '';
+    document.getElementById('fDue').value = req.due;
+    document.getElementById('fNotes').value = req.notes || '';
+
+    document.getElementById('addPanelTitle').textContent = 'Edit request';
+    document.getElementById('saveReqBtn').textContent = 'Save changes';
+
+    importPanel.classList.remove('open');
+    addPanel.classList.add('open');
+    window.scrollTo({ top: addPanel.offsetTop - 20, behavior: 'smooth' });
+  }
+
   document.getElementById('toggleAddBtn').addEventListener('click', () => {
+    const opening = !addPanel.classList.contains('open');
+    if (opening) {
+      resetToAddMode();
+      clearRequestForm();
+    }
     addPanel.classList.toggle('open');
   });
   document.getElementById('cancelAddBtn').addEventListener('click', () => {
     addPanel.classList.remove('open');
+    resetToAddMode();
+    clearRequestForm();
   });
 
   document.getElementById('saveReqBtn').addEventListener('click', () => {
@@ -788,16 +833,35 @@ window.__initTrackerApp = function () {
       return;
     }
 
-    requests.push({
-      id: 'r' + Date.now() + Math.random().toString(36).slice(2, 7),
-      caseName, type, custodian, method, sent, due, notes,
-      received: false,
-    });
+    const candidate = { caseName, type, custodian, method, sent, due, notes };
+
+    // When editing, exclude the request being edited from the duplicate
+    // check — otherwise saving it unchanged would flag it as a duplicate
+    // of itself.
+    const othersForDupeCheck = editingRequestId
+      ? requests.filter(r => r.id !== editingRequestId)
+      : requests;
+
+    if (isDuplicateRequest(candidate, othersForDupeCheck)) {
+      alert('A request with this case name, custodian, and due date is already tracked.');
+      return;
+    }
+
+    if (editingRequestId) {
+      requests = requests.map(r =>
+        r.id === editingRequestId ? { ...r, ...candidate } : r
+      );
+    } else {
+      requests.push({
+        id: 'r' + Date.now() + Math.random().toString(36).slice(2, 7),
+        ...candidate,
+        received: false,
+      });
+    }
     saveRequests(requests);
 
-    ['fCase','fCustodian','fMethod','fSent','fDue','fNotes'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
+    resetToAddMode();
+    clearRequestForm();
     addPanel.classList.remove('open');
     render();
   });
@@ -885,8 +949,39 @@ window.__initTrackerApp = function () {
     return d.toISOString().slice(0, 10);
   }
 
+  /**
+   * Maps a free-text type value to one of the canonical REQUEST_TYPES using
+   * keyword matching, so "Records", "Record Request", "Deposition" etc. all
+   * land in the right group instead of silently defaulting to "Subpoena".
+   */
+  function normalizeRequestType(raw) {
+    const t = String(raw || '').trim().toLowerCase();
+    if (!t) return 'Subpoena';
+    const exact = REQUEST_TYPES.find(rt => rt.toLowerCase() === t);
+    if (exact) return exact;
+    if (t.includes('deposition')) return 'Deposition notice';
+    if (t.includes('record')) return 'Records request';
+    if (t.includes('subpoena')) return 'Subpoena';
+    return 'Subpoena'; // genuinely unrecognized — safe default
+  }
+
+  /**
+   * A request is treated as a duplicate of an existing one if the case name,
+   * custodian, and due date all match (case-insensitive, trimmed). This is
+   * intentionally a bit loose — it's meant to catch "I imported this file
+   * twice" and "I already added this by hand", not to be a strict unique key.
+   */
+  function isDuplicateRequest(candidate, existingList) {
+    const norm = s => String(s || '').trim().toLowerCase();
+    return existingList.some(r =>
+      norm(r.caseName) === norm(candidate.caseName) &&
+      norm(r.custodian) === norm(candidate.custodian) &&
+      r.due === candidate.due
+    );
+  }
+
   function rowsToRequests(rows) {
-    let imported = 0, skipped = 0;
+    let imported = 0, skipped = 0, duplicates = 0;
     rows.forEach(rawRow => {
       const row = {};
       Object.keys(rawRow).forEach(k => {
@@ -903,27 +998,29 @@ window.__initTrackerApp = function () {
         return;
       }
 
-      let type = String(row.type || '').trim();
-      if (!REQUEST_TYPES.some(t => t.toLowerCase() === type.toLowerCase())) {
-        type = 'Subpoena'; // sensible default when the column is missing/unrecognized
-      } else {
-        type = REQUEST_TYPES.find(t => t.toLowerCase() === type.toLowerCase());
-      }
-
-      requests.push({
-        id: 'r' + Date.now() + Math.random().toString(36).slice(2, 7),
+      const candidate = {
         caseName,
-        type,
+        type: normalizeRequestType(row.type),
         custodian,
         method: String(row.method || '').trim(),
         sent: parseDateLoose(row.sent),
         due,
         notes: String(row.notes || '').trim(),
         received: false,
+      };
+
+      if (isDuplicateRequest(candidate, requests)) {
+        duplicates++;
+        return;
+      }
+
+      requests.push({
+        id: 'r' + Date.now() + Math.random().toString(36).slice(2, 7),
+        ...candidate,
       });
       imported++;
     });
-    return { imported, skipped };
+    return { imported, skipped, duplicates };
   }
 
   function handleSpreadsheetFile(file) {
@@ -939,8 +1036,8 @@ window.__initTrackerApp = function () {
         header: true,
         skipEmptyLines: true,
         complete: (results) => {
-          const { imported, skipped } = rowsToRequests(results.data);
-          finishImport(imported, skipped, statusEl);
+          const { imported, skipped, duplicates } = rowsToRequests(results.data);
+          finishImport(imported, skipped, duplicates, statusEl);
         },
         error: () => setImportStatus(statusEl, 'Could not read that CSV file.', 'error'),
       });
@@ -955,8 +1052,8 @@ window.__initTrackerApp = function () {
           const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
           const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
-          const { imported, skipped } = rowsToRequests(rows);
-          finishImport(imported, skipped, statusEl);
+          const { imported, skipped, duplicates } = rowsToRequests(rows);
+          finishImport(imported, skipped, duplicates, statusEl);
         } catch (err) {
           setImportStatus(statusEl, 'Could not read that Excel file.', 'error');
         }
@@ -967,15 +1064,23 @@ window.__initTrackerApp = function () {
     }
   }
 
-  function finishImport(imported, skipped, statusEl) {
+  function finishImport(imported, skipped, duplicates, statusEl) {
     if (imported > 0) saveRequests(requests);
     render();
-    if (imported === 0) {
-      setImportStatus(statusEl, 'No rows could be imported. Check that Case Name, Custodian, and Due Date columns are filled in.', 'error');
-    } else if (skipped > 0) {
-      setImportStatus(statusEl, `Imported ${imported} request${imported === 1 ? '' : 's'}. Skipped ${skipped} row${skipped === 1 ? '' : 's'} missing a case name, custodian, or due date.`, 'info');
+
+    const parts = [];
+    if (imported > 0) parts.push(`Imported ${imported} request${imported === 1 ? '' : 's'}`);
+    if (duplicates > 0) parts.push(`skipped ${duplicates} already-tracked duplicate${duplicates === 1 ? '' : 's'}`);
+    if (skipped > 0) parts.push(`skipped ${skipped} row${skipped === 1 ? '' : 's'} missing a case name, custodian, or due date`);
+
+    if (imported === 0 && duplicates === 0 && skipped === 0) {
+      setImportStatus(statusEl, 'No rows found in that file.', 'error');
+    } else if (imported === 0) {
+      setImportStatus(statusEl, parts.join('; ') + '.', 'error');
+    } else if (duplicates > 0 || skipped > 0) {
+      setImportStatus(statusEl, parts.join('; ') + '.', 'info');
     } else {
-      setImportStatus(statusEl, `Imported ${imported} request${imported === 1 ? '' : 's'} successfully.`, 'success');
+      setImportStatus(statusEl, parts.join('; ') + '.', 'success');
     }
   }
 
