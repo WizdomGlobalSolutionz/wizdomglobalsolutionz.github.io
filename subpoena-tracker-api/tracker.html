@@ -154,6 +154,105 @@
   .form-field textarea { resize: vertical; min-height: 50px; }
   .form-actions { margin-top: 16px; display: flex; gap: 10px; }
 
+  /* ---------- Import panel ---------- */
+  #importPanel {
+    display: none;
+    border: 1.5px solid var(--accent);
+    border-radius: 8px;
+    padding: 22px;
+    margin-bottom: 28px;
+  }
+  #importPanel.open { display: block; }
+  #importPanel h3 { font-size: 15px; color: var(--ink); margin-bottom: 4px; }
+  #importPanel .import-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 16px; }
+
+  .import-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .import-tab {
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+  }
+  .import-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .import-tab-panel { display: none; }
+  .import-tab-panel.active { display: block; }
+
+  .dropzone {
+    border: 1.5px dashed var(--paper-line);
+    border-radius: 8px;
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    background: var(--paper);
+  }
+  .dropzone:hover { border-color: var(--accent); }
+  .dropzone.dragover { border-color: var(--accent); background: rgba(47,111,237,0.06); }
+  .dropzone p { font-size: 13px; color: var(--muted); }
+  .dropzone .dz-main { font-size: 14px; color: var(--ink); font-weight: 600; margin-bottom: 4px; }
+  .dropzone input[type="file"] { display: none; }
+
+  .import-status {
+    margin-top: 14px;
+    font-size: 12.5px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    display: none;
+  }
+  .import-status.show { display: block; }
+  .import-status.success { background: var(--green-bg); color: var(--green); }
+  .import-status.error { background: var(--red-bg); color: var(--red); }
+  .import-status.info { background: var(--paper); color: var(--muted); }
+
+  .template-link {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  /* ---------- Request groups ---------- */
+  .group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 26px 0 12px;
+  }
+  .group-header:first-child { margin-top: 0; }
+  .group-header h3 {
+    font-size: 14px;
+    color: var(--ink);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .group-header .count {
+    font-size: 11.5px;
+    color: var(--muted);
+    background: var(--paper);
+    padding: 2px 9px;
+    border-radius: 20px;
+  }
+  .group-header .line {
+    flex: 1;
+    height: 1px;
+    background: var(--paper-line);
+  }
+
   /* ---------- Request list ---------- */
   .req-row {
     border-left: 4px solid var(--paper-line);
@@ -293,6 +392,10 @@
     cursor: pointer;
   }
   .trial-banner a:hover { color: #fff; }
+  .trial-banner.cancel-pending {
+    background: #4a3a12;
+  }
+  .trial-banner.cancel-pending p { color: #f5d47a; }
 
   #loadingScreen {
     min-height: 70vh;
@@ -318,6 +421,10 @@
   }
 </style>
 </head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <body>
 
   <div id="loadingScreen">Checking your account...</div>
@@ -381,7 +488,10 @@
 
         <div class="toolbar">
           <h2>Outstanding requests</h2>
-          <button class="btn btn-primary" id="toggleAddBtn">+ Add request</button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-ghost" id="toggleImportBtn">Import records</button>
+            <button class="btn btn-primary" id="toggleAddBtn">+ Add request</button>
+          </div>
         </div>
 
         <div id="addPanel">
@@ -423,6 +533,39 @@
           <div class="form-actions">
             <button class="btn btn-primary" id="saveReqBtn">Save request</button>
             <button class="btn btn-ghost" id="cancelAddBtn">Cancel</button>
+          </div>
+        </div>
+
+        <div id="importPanel">
+          <h3>Import records</h3>
+          <p class="import-sub">Bring in requests from a spreadsheet, or pull one from a subpoena/records-request document.</p>
+
+          <div class="import-tabs">
+            <button class="import-tab active" data-tab="spreadsheet">CSV / Excel (bulk)</button>
+            <button class="import-tab" data-tab="document">PDF / Word (single request)</button>
+          </div>
+
+          <div class="import-tab-panel active" id="tabSpreadsheet">
+            <div class="dropzone" id="spreadsheetDrop">
+              <div class="dz-main">Drop a CSV or Excel file here, or click to browse</div>
+              <p>Columns: Case Name, Type, Custodian, Method, Date Sent, Due Date, Notes</p>
+              <input type="file" id="spreadsheetInput" accept=".csv,.xlsx,.xls" />
+            </div>
+            <span class="template-link" id="downloadTemplateBtn">Download a blank template (.csv)</span>
+            <div class="import-status" id="spreadsheetStatus"></div>
+          </div>
+
+          <div class="import-tab-panel" id="tabDocument">
+            <div class="dropzone" id="documentDrop">
+              <div class="dz-main">Drop a PDF or Word file here, or click to browse</div>
+              <p>We'll pull out what we can find and let you review before saving</p>
+              <input type="file" id="documentInput" accept=".pdf,.docx" />
+            </div>
+            <div class="import-status" id="documentStatus"></div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-ghost" id="cancelImportBtn">Close</button>
           </div>
         </div>
 
@@ -514,6 +657,8 @@ window.__initTrackerApp = function () {
     return `Subject: ${subject}\n\n${body}`;
   }
 
+  const REQUEST_TYPES = ['Subpoena', 'Records request', 'Deposition notice'];
+
   function render() {
     reqList.innerHTML = '';
 
@@ -523,49 +668,67 @@ window.__initTrackerApp = function () {
       emptyState.style.display = 'none';
     }
 
-    // Sort: overdue first, then soon, then on-track, then received.
     const order = { overdue: 0, soon: 1, ontrack: 2, received: 3 };
-    const sorted = [...requests].sort((a, b) => order[computeStatus(a)] - order[computeStatus(b)]);
-
     let overdueCount = 0, soonCount = 0, receivedCount = 0;
 
-    sorted.forEach(req => {
-      const status = computeStatus(req);
-      if (status === 'overdue') overdueCount++;
-      if (status === 'soon') soonCount++;
-      if (status === 'received') receivedCount++;
+    // Group requests by type, in a fixed order, so related requests sit together.
+    // Any type not in the canonical list (e.g. from an odd import) gets its own
+    // trailing group rather than being dropped.
+    const seenTypes = Array.from(new Set(requests.map(r => r.type)));
+    const groupOrder = REQUEST_TYPES.concat(seenTypes.filter(t => !REQUEST_TYPES.includes(t)));
 
-      const row = document.createElement('div');
-      row.className = `req-row status-${status}`;
+    groupOrder.forEach(type => {
+      const group = requests.filter(r => r.type === type);
+      if (group.length === 0) return;
 
-      row.innerHTML = `
-        <div class="req-top">
-          <div class="req-main">
-            <h3>${escapeHtml(req.caseName)}</h3>
-            <div class="req-meta">${escapeHtml(req.type)} &middot; ${escapeHtml(req.custodian)} &middot; sent ${formatDate(req.sent)} via ${escapeHtml(req.method || 'unspecified')} &middot; due ${formatDate(req.due)}</div>
-          </div>
-          <span class="status-tag ${status}">${statusLabel(status, req)}</span>
-        </div>
-        ${req.notes ? `<div class="req-notes">${escapeHtml(req.notes)}</div>` : ''}
-        <div class="req-actions">
-          ${status !== 'received' ? `<button class="btn btn-ghost btn-sm" data-action="followup" data-id="${req.id}">Generate follow-up</button>` : ''}
-          ${status !== 'received' ? `<button class="btn btn-ghost btn-sm" data-action="receive" data-id="${req.id}">Mark received</button>` : ''}
-          <button class="btn btn-ghost btn-sm" data-action="delete" data-id="${req.id}">Remove</button>
-        </div>
-        <div class="followup-box" id="fb-${req.id}">
-          <textarea readonly id="fb-text-${req.id}">${escapeHtml(buildFollowupEmail(req))}</textarea>
-          <div class="fb-actions">
-            <button class="btn btn-primary btn-sm" data-action="copy" data-id="${req.id}">Copy to clipboard</button>
-          </div>
-        </div>
-      `;
-      reqList.appendChild(row);
+      const sorted = [...group].sort((a, b) => order[computeStatus(a)] - order[computeStatus(b)]);
+
+      const header = document.createElement('div');
+      header.className = 'group-header';
+      header.innerHTML = `<h3>${escapeHtml(type)}</h3><span class="count">${group.length}</span><div class="line"></div>`;
+      reqList.appendChild(header);
+
+      sorted.forEach(req => {
+        const status = computeStatus(req);
+        if (status === 'overdue') overdueCount++;
+        if (status === 'soon') soonCount++;
+        if (status === 'received') receivedCount++;
+        reqList.appendChild(buildRequestRow(req, status));
+      });
     });
 
     document.getElementById('statOverdue').textContent = overdueCount;
     document.getElementById('statSoon').textContent = soonCount;
     document.getElementById('statOpen').textContent = requests.filter(r => !r.received).length;
     document.getElementById('statReceived').textContent = receivedCount;
+  }
+
+  function buildRequestRow(req, status) {
+    const row = document.createElement('div');
+    row.className = `req-row status-${status}`;
+
+    row.innerHTML = `
+      <div class="req-top">
+        <div class="req-main">
+          <h3>${escapeHtml(req.caseName)}</h3>
+          <div class="req-meta">${escapeHtml(req.type)} &middot; ${escapeHtml(req.custodian)} &middot; sent ${formatDate(req.sent)} via ${escapeHtml(req.method || 'unspecified')} &middot; due ${formatDate(req.due)}</div>
+        </div>
+        <span class="status-tag ${status}">${statusLabel(status, req)}</span>
+      </div>
+      ${req.notes ? `<div class="req-notes">${escapeHtml(req.notes)}</div>` : ''}
+      <div class="req-actions">
+        ${status !== 'received' ? `<button class="btn btn-ghost btn-sm" data-action="followup" data-id="${req.id}">Generate follow-up</button>` : ''}
+        ${status !== 'received' ? `<button class="btn btn-ghost btn-sm" data-action="receive" data-id="${req.id}">Mark received</button>` : ''}
+        <button class="btn btn-ghost btn-sm" data-action="delete" data-id="${req.id}">Remove</button>
+      </div>
+      <div class="followup-box" id="fb-${req.id}">
+        <textarea readonly id="fb-text-${req.id}">${escapeHtml(buildFollowupEmail(req))}</textarea>
+        <div class="fb-actions">
+          <button class="btn btn-primary btn-sm" data-action="copy" data-id="${req.id}">Copy to clipboard</button>
+        </div>
+      </div>
+    `;
+    return row;
   }
 
   function escapeHtml(str) {
@@ -647,6 +810,284 @@ window.__initTrackerApp = function () {
     }
   });
 
+  // ---------- Import: panel open/close and tab switching ----------
+
+  const importPanel = document.getElementById('importPanel');
+
+  document.getElementById('toggleImportBtn').addEventListener('click', () => {
+    importPanel.classList.toggle('open');
+    addPanel.classList.remove('open');
+  });
+  document.getElementById('cancelImportBtn').addEventListener('click', () => {
+    importPanel.classList.remove('open');
+  });
+
+  document.querySelectorAll('.import-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.import-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.import-tab-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('tab' + tab.dataset.tab.charAt(0).toUpperCase() + tab.dataset.tab.slice(1)).classList.add('active');
+    });
+  });
+
+  function setImportStatus(el, message, kind) {
+    el.textContent = message;
+    el.className = `import-status show ${kind}`;
+  }
+
+  function setupDropzone(dropId, inputId, onFile) {
+    const drop = document.getElementById(dropId);
+    const input = document.getElementById(inputId);
+    drop.addEventListener('click', () => input.click());
+    input.addEventListener('change', () => {
+      if (input.files[0]) onFile(input.files[0]);
+      input.value = '';
+    });
+    ['dragover', 'dragenter'].forEach(evt =>
+      drop.addEventListener(evt, e => { e.preventDefault(); drop.classList.add('dragover'); })
+    );
+    ['dragleave', 'drop'].forEach(evt =>
+      drop.addEventListener(evt, e => { e.preventDefault(); drop.classList.remove('dragover'); })
+    );
+    drop.addEventListener('drop', e => {
+      const file = e.dataTransfer.files[0];
+      if (file) onFile(file);
+    });
+  }
+
+  // ---------- CSV / Excel bulk import ----------
+
+  const CSV_HEADER_MAP = {
+    casename: 'caseName', case: 'caseName', matter: 'caseName', mattername: 'caseName',
+    type: 'type', requesttype: 'type',
+    custodian: 'custodian', sentto: 'custodian', party: 'custodian',
+    method: 'method', sentvia: 'method',
+    datesent: 'sent', sent: 'sent',
+    duedate: 'due', due: 'due', responsedue: 'due',
+    notes: 'notes', note: 'notes',
+  };
+
+  function normalizeHeader(h) {
+    return String(h || '').trim().toLowerCase().replace(/\s+/g, '');
+  }
+
+  function parseDateLoose(value) {
+    if (!value) return '';
+    if (value instanceof Date && !isNaN(value.getTime())) {
+      return value.toISOString().slice(0, 10);
+    }
+    const str = String(value).trim();
+    // Already ISO (YYYY-MM-DD)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10);
+  }
+
+  function rowsToRequests(rows) {
+    let imported = 0, skipped = 0;
+    rows.forEach(rawRow => {
+      const row = {};
+      Object.keys(rawRow).forEach(k => {
+        const mapped = CSV_HEADER_MAP[normalizeHeader(k)];
+        if (mapped) row[mapped] = rawRow[k];
+      });
+
+      const caseName = String(row.caseName || '').trim();
+      const custodian = String(row.custodian || '').trim();
+      const due = parseDateLoose(row.due);
+
+      if (!caseName || !custodian || !due) {
+        skipped++;
+        return;
+      }
+
+      let type = String(row.type || '').trim();
+      if (!REQUEST_TYPES.some(t => t.toLowerCase() === type.toLowerCase())) {
+        type = 'Subpoena'; // sensible default when the column is missing/unrecognized
+      } else {
+        type = REQUEST_TYPES.find(t => t.toLowerCase() === type.toLowerCase());
+      }
+
+      requests.push({
+        id: 'r' + Date.now() + Math.random().toString(36).slice(2, 7),
+        caseName,
+        type,
+        custodian,
+        method: String(row.method || '').trim(),
+        sent: parseDateLoose(row.sent),
+        due,
+        notes: String(row.notes || '').trim(),
+        received: false,
+      });
+      imported++;
+    });
+    return { imported, skipped };
+  }
+
+  function handleSpreadsheetFile(file) {
+    const statusEl = document.getElementById('spreadsheetStatus');
+    const ext = file.name.split('.').pop().toLowerCase();
+
+    if (ext === 'csv') {
+      if (typeof Papa === 'undefined') {
+        setImportStatus(statusEl, 'CSV parser failed to load. Check your connection and reload the page.', 'error');
+        return;
+      }
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const { imported, skipped } = rowsToRequests(results.data);
+          finishImport(imported, skipped, statusEl);
+        },
+        error: () => setImportStatus(statusEl, 'Could not read that CSV file.', 'error'),
+      });
+    } else if (ext === 'xlsx' || ext === 'xls') {
+      if (typeof XLSX === 'undefined') {
+        setImportStatus(statusEl, 'Excel parser failed to load. Check your connection and reload the page.', 'error');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+          const { imported, skipped } = rowsToRequests(rows);
+          finishImport(imported, skipped, statusEl);
+        } catch (err) {
+          setImportStatus(statusEl, 'Could not read that Excel file.', 'error');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      setImportStatus(statusEl, 'Please upload a .csv, .xlsx, or .xls file.', 'error');
+    }
+  }
+
+  function finishImport(imported, skipped, statusEl) {
+    if (imported > 0) saveRequests(requests);
+    render();
+    if (imported === 0) {
+      setImportStatus(statusEl, 'No rows could be imported. Check that Case Name, Custodian, and Due Date columns are filled in.', 'error');
+    } else if (skipped > 0) {
+      setImportStatus(statusEl, `Imported ${imported} request${imported === 1 ? '' : 's'}. Skipped ${skipped} row${skipped === 1 ? '' : 's'} missing a case name, custodian, or due date.`, 'info');
+    } else {
+      setImportStatus(statusEl, `Imported ${imported} request${imported === 1 ? '' : 's'} successfully.`, 'success');
+    }
+  }
+
+  setupDropzone('spreadsheetDrop', 'spreadsheetInput', handleSpreadsheetFile);
+
+  document.getElementById('downloadTemplateBtn').addEventListener('click', () => {
+    const csv = 'Case Name,Type,Custodian,Method,Date Sent,Due Date,Notes\n' +
+      'Doe v. Acme Corp,Subpoena,St. Mary\'s Hospital — Records Dept,Certified mail,2026-09-01,2026-09-15,\n';
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'request-import-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // ---------- PDF / Word single-document import ----------
+
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+
+  async function extractPdfText(file) {
+    const buffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+    let text = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(it => it.str).join(' ') + '\n';
+    }
+    return text;
+  }
+
+  async function extractDocxText(file) {
+    const buffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+    return result.value;
+  }
+
+  function guessFieldsFromText(text) {
+    const guess = { caseName: '', type: 'Subpoena', custodian: '', sent: '', due: '', notes: '' };
+
+    // Case name: look for "X v. Y" or "Case No. ..." patterns.
+    const caseMatch = text.match(/([A-Z][A-Za-z.,'&\s]{2,60}\sv\.?\s[A-Z][A-Za-z.,'&\s]{2,60})/);
+    if (caseMatch) guess.caseName = caseMatch[1].trim();
+    const caseNoMatch = text.match(/Case\s*(?:No\.?|Number)?\s*[:#]?\s*([A-Za-z0-9\-]{4,20})/i);
+    if (!guess.caseName && caseNoMatch) guess.caseName = `Case No. ${caseNoMatch[1]}`;
+
+    // Request type from keywords.
+    if (/deposition/i.test(text)) guess.type = 'Deposition notice';
+    else if (/records?\s+request/i.test(text)) guess.type = 'Records request';
+    else if (/subpoena/i.test(text)) guess.type = 'Subpoena';
+
+    // Custodian: text following "To:" or "Custodian of Records".
+    const toMatch = text.match(/(?:To|Custodian of Records|Attn)\s*[:\-]\s*([A-Za-z0-9.,&'\s]{3,80})/i);
+    if (toMatch) guess.custodian = toMatch[1].trim().split('\n')[0];
+
+    // Any date-looking string becomes a candidate for "due"; we don't guess "sent"
+    // confidently from a single document, so leave it for the user to set.
+    const dateMatch = text.match(/\b(\d{1,2}\/\d{1,2}\/\d{2,4}|\w+\s+\d{1,2},\s*\d{4})\b/);
+    if (dateMatch) {
+      const parsed = parseDateLoose(dateMatch[1]);
+      if (parsed) guess.due = parsed;
+    }
+
+    guess.notes = 'Imported from document — please review all fields below before saving.';
+    return guess;
+  }
+
+  async function handleDocumentFile(file) {
+    const statusEl = document.getElementById('documentStatus');
+    const ext = file.name.split('.').pop().toLowerCase();
+    setImportStatus(statusEl, 'Reading document...', 'info');
+
+    try {
+      let text = '';
+      if (ext === 'pdf') {
+        if (typeof pdfjsLib === 'undefined') throw new Error('PDF reader failed to load.');
+        text = await extractPdfText(file);
+      } else if (ext === 'docx') {
+        if (typeof mammoth === 'undefined') throw new Error('Word reader failed to load.');
+        text = await extractDocxText(file);
+      } else {
+        setImportStatus(statusEl, 'Please upload a .pdf or .docx file.', 'error');
+        return;
+      }
+
+      const guess = guessFieldsFromText(text);
+
+      // Prefill the Add Request form and open it for review — we never save
+      // automatically, since extraction from a free-form document is a best
+      // guess, not a guarantee.
+      document.getElementById('fCase').value = guess.caseName;
+      document.getElementById('fType').value = guess.type;
+      document.getElementById('fCustodian').value = guess.custodian;
+      document.getElementById('fDue').value = guess.due;
+      document.getElementById('fNotes').value = guess.notes;
+
+      importPanel.classList.remove('open');
+      addPanel.classList.add('open');
+      setImportStatus(statusEl, 'Extracted what we could find — review it in the form above.', 'success');
+      window.scrollTo({ top: addPanel.offsetTop - 20, behavior: 'smooth' });
+    } catch (err) {
+      setImportStatus(statusEl, err.message || 'Could not read that document.', 'error');
+    }
+  }
+
+  setupDropzone('documentDrop', 'documentInput', handleDocumentFile);
+
   render();
 };
 </script>
@@ -691,16 +1132,20 @@ window.__initTrackerApp = function () {
   }
 
   function renderTrialBanner(entitlement) {
+    const cancelSuffix = entitlement.cancelAtPeriodEnd ? ' · subscription set to cancel' : '';
+
     if (entitlement.status === 'trialing' && entitlement.currentPeriodEnd) {
       const daysLeft = Math.max(
         0,
         Math.ceil((entitlement.currentPeriodEnd * 1000 - Date.now()) / 86400000)
       );
-      trialBannerText.textContent = `Free trial — ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`;
+      trialBannerText.textContent = `Free trial — ${daysLeft} day${daysLeft === 1 ? '' : 's'} left${cancelSuffix}`;
       trialBanner.style.display = 'block';
+      trialBanner.classList.toggle('cancel-pending', !!entitlement.cancelAtPeriodEnd);
     } else if (entitlement.status === 'active') {
-      trialBannerText.textContent = 'Premium — active subscription';
+      trialBannerText.textContent = `Premium — active subscription${cancelSuffix}`;
       trialBanner.style.display = 'block';
+      trialBanner.classList.toggle('cancel-pending', !!entitlement.cancelAtPeriodEnd);
     } else {
       trialBanner.style.display = 'none';
     }
