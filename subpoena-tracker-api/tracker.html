@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Records & Subpoena Tracker — Prototype</title>
+<style>
+  :root {
+    --navy-900: #0B1A2E;
+    --navy-800: #10233C;
+    --navy-700: #16304F;
+    --accent: #2F6FED;
+    --paper: #F4F6F8;
+    --paper-line: #E1E6EB;
+    --ink: #1C2530;
+    --muted: #5B6570;
+    --muted-2: #8A94A0;
+    --green: #1E9E5A;
+    --green-bg: #E7F5ED;
+    --amber: #B8860B;
+    --amber-bg: #FBF3DF;
+    --red: #C53D3D;
+    --red-bg: #FBEAEA;
+    --page-bg: #FFFFFF;
+    --page-text: #1C2530;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-bg: #0B1A2E;
+      --page-text: #EDEFF2;
+      --paper: #12233C;
+      --paper-line: #223350;
+      --ink: #EDEFF2;
+      --muted: #AEB8C4;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-bg: #0B1A2E;
+    --page-text: #EDEFF2;
+    --paper: #12233C;
+    --paper-line: #223350;
+    --ink: #EDEFF2;
+    --muted: #AEB8C4;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--page-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; margin: 0; font-weight: 700; }
+  p { margin: 0; }
+  button { font-family: inherit; cursor: pointer; }
+
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 28px; }
+
+  header {
+    background: var(--navy-900);
+    padding: 30px 0;
+  }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-mark {
+    width: 34px; height: 34px; border-radius: 8px;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-family: Georgia, serif; font-weight: 700; font-size: 16px;
+    flex-shrink: 0;
+  }
+  header h1 { color: #fff; font-size: 19px; }
+  header p.tag { color: #9AA5B1; font-size: 12.5px; margin-top: 2px; }
+  .proto-badge {
+    font-size: 11px;
+    color: #9AA5B1;
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 5px 10px;
+    border-radius: 5px;
+  }
+
+  main { padding: 36px 0 80px; }
+
+  .summary-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--paper-line);
+    border: 1px solid var(--paper-line);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+  .summary-cell {
+    background: var(--page-bg);
+    padding: 18px 20px;
+  }
+  .summary-cell .n { font-family: Georgia, serif; font-size: 26px; font-weight: 700; color: var(--ink); }
+  .summary-cell .l { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .summary-cell.overdue .n { color: var(--red); }
+  .summary-cell.soon .n { color: var(--amber); }
+
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .toolbar h2 { font-size: 20px; color: var(--ink); }
+  .btn {
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 13.5px;
+    font-weight: 600;
+    border: 1.5px solid transparent;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #2860cc; }
+  .btn-ghost { background: transparent; color: var(--ink); border-color: var(--paper-line); }
+  .btn-ghost:hover { border-color: var(--muted); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 5px; }
+
+  /* ---------- Add form panel ---------- */
+  #addPanel {
+    display: none;
+    border: 1.5px solid var(--navy-900);
+    border-radius: 8px;
+    padding: 22px;
+    margin-bottom: 28px;
+  }
+  #addPanel.open { display: block; }
+  #addPanel h3 { font-size: 15px; color: var(--ink); margin-bottom: 16px; }
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .form-field { display: flex; flex-direction: column; gap: 6px; }
+  .form-field.full { grid-column: 1 / -1; }
+  .form-field label { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .form-field input, .form-field select, .form-field textarea {
+    padding: 9px 10px;
+    border: 1px solid var(--paper-line);
+    border-radius: 5px;
+    font-size: 13.5px;
+    font-family: inherit;
+    background: var(--page-bg);
+    color: var(--page-text);
+  }
+  .form-field textarea { resize: vertical; min-height: 50px; }
+  .form-actions { margin-top: 16px; display: flex; gap: 10px; }
+
+  /* ---------- Request list ---------- */
+  .req-row {
+    border-left: 4px solid var(--paper-line);
+    padding: 16px 18px;
+    margin-bottom: 10px;
+    background: var(--paper);
+    border-radius: 0 6px 6px 0;
+  }
+  .req-row.status-overdue { border-left-color: var(--red); }
+  .req-row.status-soon { border-left-color: var(--amber); }
+  .req-row.status-ontrack { border-left-color: var(--green); }
+  .req-row.status-received { border-left-color: var(--muted-2); opacity: 0.7; }
+
+  .req-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .req-main h3 { font-size: 15.5px; color: var(--ink); }
+  .req-meta { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  .status-tag {
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 4px;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+  }
+  .status-tag.overdue { background: var(--red-bg); color: var(--red); }
+  .status-tag.soon { background: var(--amber-bg); color: var(--amber); }
+  .status-tag.ontrack { background: var(--green-bg); color: var(--green); }
+  .status-tag.received { background: var(--paper-line); color: var(--muted); }
+
+  .req-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .req-notes { font-size: 12.5px; color: var(--muted); margin-top: 10px; font-style: italic; }
+
+  .followup-box {
+    display: none;
+    margin-top: 14px;
+    padding: 14px;
+    background: var(--page-bg);
+    border: 1px solid var(--paper-line);
+    border-radius: 6px;
+  }
+  .followup-box.open { display: block; }
+  .followup-box textarea {
+    width: 100%;
+    min-height: 160px;
+    border: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    color: var(--ink);
+    background: transparent;
+    resize: vertical;
+  }
+  .followup-box .fb-actions { margin-top: 8px; display: flex; gap: 8px; }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  /* ---------- Paywall / gate ---------- */
+  #appShell { display: none; }
+  #appShell.unlocked { display: block; }
+
+  #gateScreen {
+    min-height: 70vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+  }
+  #gateScreen.hidden { display: none; }
+  .gate-card {
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+  }
+  .gate-card h2 {
+    font-size: 24px;
+    color: var(--ink);
+  }
+  .gate-card p.gate-sub {
+    color: var(--muted);
+    font-size: 14px;
+    margin-top: 10px;
+    line-height: 1.6;
+  }
+  .gate-form {
+    margin-top: 26px;
+    display: flex;
+    gap: 8px;
+  }
+  .gate-form input {
+    flex: 1;
+    padding: 11px 14px;
+    border: 1px solid var(--paper-line);
+    border-radius: 6px;
+    font-size: 14px;
+    background: var(--page-bg);
+    color: var(--page-text);
+  }
+  .gate-note {
+    margin-top: 14px;
+    font-size: 12px;
+    color: var(--muted-2);
+  }
+  .gate-error {
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: var(--red);
+    display: none;
+  }
+  .gate-error.show { display: block; }
+
+  .trial-banner {
+    background: var(--navy-900);
+    padding: 10px 0;
+  }
+  .trial-banner .wrap {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .trial-banner p { color: #fff; font-size: 12.5px; }
+  .trial-banner a {
+    color: #9AA5B1;
+    font-size: 12px;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .trial-banner a:hover { color: #fff; }
+
+  #loadingScreen {
+    min-height: 70vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  #loadingScreen.hidden { display: none; }
+
+  footer {
+    border-top: 1px solid var(--paper-line);
+    padding: 22px 0;
+  }
+  footer .wrap { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+  footer p { font-size: 11.5px; color: var(--muted-2); }
+
+  @media (max-width: 640px) {
+    .summary-strip { grid-template-columns: repeat(2, 1fr); }
+    .form-grid { grid-template-columns: 1fr; }
+    .wrap { padding: 0 18px; }
+  }
+</style>
+</head>
+<body>
+
+  <div id="loadingScreen">Checking your account...</div>
+
+  <div id="gateScreen" class="hidden">
+    <div class="gate-card">
+      <div class="brand-mark" style="margin: 0 auto 20px;">W</div>
+      <h2>Records &amp; Subpoena Tracker</h2>
+      <p class="gate-sub">Track outstanding requests, know what's overdue, and generate follow-ups in one click. Start with a 3-day free trial — no charge until it ends.</p>
+      <div class="gate-form">
+        <input type="email" id="gateEmail" placeholder="you@firm.com" />
+        <button class="btn btn-primary" id="gateStartBtn">Start free trial</button>
+      </div>
+      <p class="gate-note">Already subscribed? Enter the same email to unlock this browser.</p>
+      <p class="gate-error" id="gateError"></p>
+    </div>
+  </div>
+
+  <div id="appShell">
+    <div class="trial-banner" id="trialBanner" style="display:none;">
+      <div class="wrap">
+        <p id="trialBannerText"></p>
+        <a id="manageSubBtn">Manage subscription</a>
+      </div>
+    </div>
+
+    <header>
+      <div class="wrap">
+        <div class="brand">
+          <div class="brand-mark">W</div>
+          <div>
+            <h1>Records &amp; Subpoena Tracker</h1>
+            <p class="tag">Know exactly what's outstanding, and what to send next.</p>
+          </div>
+        </div>
+        <div class="proto-badge">Premium</div>
+      </div>
+    </header>
+
+    <main>
+      <div class="wrap">
+
+        <div class="summary-strip">
+          <div class="summary-cell overdue">
+            <div class="n" id="statOverdue">0</div>
+            <div class="l">Overdue</div>
+          </div>
+          <div class="summary-cell soon">
+            <div class="n" id="statSoon">0</div>
+            <div class="l">Due within 3 days</div>
+          </div>
+          <div class="summary-cell">
+            <div class="n" id="statOpen">0</div>
+            <div class="l">Total outstanding</div>
+          </div>
+          <div class="summary-cell">
+            <div class="n" id="statReceived">0</div>
+            <div class="l">Received</div>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <h2>Outstanding requests</h2>
+          <button class="btn btn-primary" id="toggleAddBtn">+ Add request</button>
+        </div>
+
+        <div id="addPanel">
+          <h3>New subpoena / records request</h3>
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="fCase">Case / matter name</label>
+              <input type="text" id="fCase" placeholder="e.g. Doe v. Acme Corp" />
+            </div>
+            <div class="form-field">
+              <label for="fType">Request type</label>
+              <select id="fType">
+                <option>Subpoena</option>
+                <option>Records request</option>
+                <option>Deposition notice</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="fCustodian">Sent to (custodian / party)</label>
+              <input type="text" id="fCustodian" placeholder="e.g. St. Mary's Hospital — Records Dept" />
+            </div>
+            <div class="form-field">
+              <label for="fMethod">Sent via</label>
+              <input type="text" id="fMethod" placeholder="e.g. Certified mail, fax, portal" />
+            </div>
+            <div class="form-field">
+              <label for="fSent">Date sent</label>
+              <input type="date" id="fSent" />
+            </div>
+            <div class="form-field">
+              <label for="fDue">Response due date</label>
+              <input type="date" id="fDue" />
+            </div>
+            <div class="form-field full">
+              <label for="fNotes">Notes (optional)</label>
+              <textarea id="fNotes" placeholder="Anything worth remembering about this request"></textarea>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" id="saveReqBtn">Save request</button>
+            <button class="btn btn-ghost" id="cancelAddBtn">Cancel</button>
+          </div>
+        </div>
+
+        <div id="reqList"></div>
+        <div class="empty-state" id="emptyState" style="display:none;">
+          Nothing tracked yet. Add your first request above.
+        </div>
+
+      </div>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <p>WizdomGlobalSolutionz &middot; Data stored only in this browser, not synced across devices.</p>
+        <button class="btn btn-ghost btn-sm" id="resetBtn">Clear all data</button>
+      </div>
+    </footer>
+  </div>
+
+<script>
+window.__initTrackerApp = function () {
+  const STORAGE_KEY = 'subpoena-tracker-requests-v1';
+
+  function loadRequests() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function saveRequests(list) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    } catch (err) {
+      // Storage unavailable — data won't persist this session, but the app still works.
+    }
+  }
+
+  let requests = loadRequests();
+
+  const reqList = document.getElementById('reqList');
+  const emptyState = document.getElementById('emptyState');
+  const addPanel = document.getElementById('addPanel');
+
+  function daysBetween(dateStr) {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const due = new Date(dateStr + 'T00:00:00');
+    return Math.round((due - today) / (1000 * 60 * 60 * 24));
+  }
+
+  function computeStatus(req) {
+    if (req.received) return 'received';
+    const diff = daysBetween(req.due);
+    if (diff < 0) return 'overdue';
+    if (diff <= 3) return 'soon';
+    return 'ontrack';
+  }
+
+  function statusLabel(status, req) {
+    if (status === 'received') return 'RECEIVED';
+    const diff = daysBetween(req.due);
+    if (status === 'overdue') return `OVERDUE — ${Math.abs(diff)}d`;
+    if (status === 'soon') return diff === 0 ? 'DUE TODAY' : `DUE IN ${diff}D`;
+    return 'ON TRACK';
+  }
+
+  function formatDate(s) {
+    if (!s) return '—';
+    const d = new Date(s + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function buildFollowupEmail(req) {
+    const diff = daysBetween(req.due);
+    const overdueBy = diff < 0 ? Math.abs(diff) : 0;
+    const subject = `Follow-up: ${req.type} — ${req.caseName}`;
+    let body = `Dear ${req.custodian || 'Sir/Madam'},\n\n`;
+    body += `I'm following up on our ${req.type.toLowerCase()} sent on ${formatDate(req.sent)} regarding ${req.caseName}. `;
+    if (overdueBy > 0) {
+      body += `As of today, we have not yet received the requested records. The response was due on ${formatDate(req.due)}, which is ${overdueBy} day${overdueBy === 1 ? '' : 's'} ago.\n\n`;
+    } else {
+      body += `The response is due on ${formatDate(req.due)}, and we wanted to confirm this is still on track.\n\n`;
+    }
+    body += `Please provide a status update at your earliest convenience, or let us know if additional documentation is needed to process this request.\n\n`;
+    body += `Thank you,\n[Your name]`;
+    return `Subject: ${subject}\n\n${body}`;
+  }
+
+  function render() {
+    reqList.innerHTML = '';
+
+    if (requests.length === 0) {
+      emptyState.style.display = 'block';
+    } else {
+      emptyState.style.display = 'none';
+    }
+
+    // Sort: overdue first, then soon, then on-track, then received.
+    const order = { overdue: 0, soon: 1, ontrack: 2, received: 3 };
+    const sorted = [...requests].sort((a, b) => order[computeStatus(a)] - order[computeStatus(b)]);
+
+    let overdueCount = 0, soonCount = 0, receivedCount = 0;
+
+    sorted.forEach(req => {
+      const status = computeStatus(req);
+      if (status === 'overdue') overdueCount++;
+      if (status === 'soon') soonCount++;
+      if (status === 'received') receivedCount++;
+
+      const row = document.createElement('div');
+      row.className = `req-row status-${status}`;
+
+      row.innerHTML = `
+        <div class="req-top">
+          <div class="req-main">
+            <h3>${escapeHtml(req.caseName)}</h3>
+            <div class="req-meta">${escapeHtml(req.type)} &middot; ${escapeHtml(req.custodian)} &middot; sent ${formatDate(req.sent)} via ${escapeHtml(req.method || 'unspecified')} &middot; due ${formatDate(req.due)}</div>
+          </div>
+          <span class="status-tag ${status}">${statusLabel(status, req)}</span>
+        </div>
+        ${req.notes ? `<div class="req-notes">${escapeHtml(req.notes)}</div>` : ''}
+        <div class="req-actions">
+          ${status !== 'received' ? `<button class="btn btn-ghost btn-sm" data-action="followup" data-id="${req.id}">Generate follow-up</button>` : ''}
+          ${status !== 'received' ? `<button class="btn btn-ghost btn-sm" data-action="receive" data-id="${req.id}">Mark received</button>` : ''}
+          <button class="btn btn-ghost btn-sm" data-action="delete" data-id="${req.id}">Remove</button>
+        </div>
+        <div class="followup-box" id="fb-${req.id}">
+          <textarea readonly id="fb-text-${req.id}">${escapeHtml(buildFollowupEmail(req))}</textarea>
+          <div class="fb-actions">
+            <button class="btn btn-primary btn-sm" data-action="copy" data-id="${req.id}">Copy to clipboard</button>
+          </div>
+        </div>
+      `;
+      reqList.appendChild(row);
+    });
+
+    document.getElementById('statOverdue').textContent = overdueCount;
+    document.getElementById('statSoon').textContent = soonCount;
+    document.getElementById('statOpen').textContent = requests.filter(r => !r.received).length;
+    document.getElementById('statReceived').textContent = receivedCount;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  reqList.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const action = btn.dataset.action;
+
+    if (action === 'followup') {
+      const box = document.getElementById(`fb-${id}`);
+      box.classList.toggle('open');
+    } else if (action === 'receive') {
+      requests = requests.map(r => r.id === id ? { ...r, received: true } : r);
+      saveRequests(requests);
+      render();
+    } else if (action === 'delete') {
+      requests = requests.filter(r => r.id !== id);
+      saveRequests(requests);
+      render();
+    } else if (action === 'copy') {
+      const textarea = document.getElementById(`fb-text-${id}`);
+      textarea.select();
+      try {
+        navigator.clipboard.writeText(textarea.value);
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy to clipboard'; }, 1500);
+      } catch (err) {
+        document.execCommand('copy');
+      }
+    }
+  });
+
+  document.getElementById('toggleAddBtn').addEventListener('click', () => {
+    addPanel.classList.toggle('open');
+  });
+  document.getElementById('cancelAddBtn').addEventListener('click', () => {
+    addPanel.classList.remove('open');
+  });
+
+  document.getElementById('saveReqBtn').addEventListener('click', () => {
+    const caseName = document.getElementById('fCase').value.trim();
+    const type = document.getElementById('fType').value;
+    const custodian = document.getElementById('fCustodian').value.trim();
+    const method = document.getElementById('fMethod').value.trim();
+    const sent = document.getElementById('fSent').value;
+    const due = document.getElementById('fDue').value;
+    const notes = document.getElementById('fNotes').value.trim();
+
+    if (!caseName || !custodian || !due) {
+      alert('Please fill in at least case name, custodian, and due date.');
+      return;
+    }
+
+    requests.push({
+      id: 'r' + Date.now() + Math.random().toString(36).slice(2, 7),
+      caseName, type, custodian, method, sent, due, notes,
+      received: false,
+    });
+    saveRequests(requests);
+
+    ['fCase','fCustodian','fMethod','fSent','fDue','fNotes'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    addPanel.classList.remove('open');
+    render();
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    if (confirm('Clear all tracked requests? This cannot be undone.')) {
+      requests = [];
+      saveRequests(requests);
+      render();
+    }
+  });
+
+  render();
+};
+</script>
+
+<script>
+// ============================================================================
+// Paywall / entitlement gate
+// Talks to the Cloudflare Worker to check whether the current user's email
+// has an active trial or paid subscription, and only then unlocks the app.
+// ============================================================================
+(function () {
+  // Update this to your deployed Worker's URL once you have it.
+  const WORKER_URL = 'https://subpoena-tracker-api.wizdomglobalsolutionz.workers.dev';
+  const EMAIL_KEY = 'tracker-user-email';
+
+  const loadingScreen = document.getElementById('loadingScreen');
+  const gateScreen = document.getElementById('gateScreen');
+  const appShell = document.getElementById('appShell');
+  const gateEmailInput = document.getElementById('gateEmail');
+  const gateStartBtn = document.getElementById('gateStartBtn');
+  const gateError = document.getElementById('gateError');
+  const trialBanner = document.getElementById('trialBanner');
+  const trialBannerText = document.getElementById('trialBannerText');
+  const manageSubBtn = document.getElementById('manageSubBtn');
+
+  function showGate(message) {
+    loadingScreen.classList.add('hidden');
+    gateScreen.classList.remove('hidden');
+    appShell.classList.remove('unlocked');
+    if (message) {
+      gateError.textContent = message;
+      gateError.classList.add('show');
+    }
+  }
+
+  function showApp(entitlement) {
+    loadingScreen.classList.add('hidden');
+    gateScreen.classList.add('hidden');
+    appShell.classList.add('unlocked');
+    renderTrialBanner(entitlement);
+    window.__initTrackerApp();
+  }
+
+  function renderTrialBanner(entitlement) {
+    if (entitlement.status === 'trialing' && entitlement.currentPeriodEnd) {
+      const daysLeft = Math.max(
+        0,
+        Math.ceil((entitlement.currentPeriodEnd * 1000 - Date.now()) / 86400000)
+      );
+      trialBannerText.textContent = `Free trial — ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`;
+      trialBanner.style.display = 'block';
+    } else if (entitlement.status === 'active') {
+      trialBannerText.textContent = 'Premium — active subscription';
+      trialBanner.style.display = 'block';
+    } else {
+      trialBanner.style.display = 'none';
+    }
+  }
+
+  async function checkStatus(email) {
+    const resp = await fetch(`${WORKER_URL}/status?email=${encodeURIComponent(email)}`);
+    if (!resp.ok) throw new Error('Could not check status');
+    return resp.json();
+  }
+
+  async function startTrial(email) {
+    gateStartBtn.disabled = true;
+    gateStartBtn.textContent = 'Redirecting...';
+    try {
+      const resp = await fetch(`${WORKER_URL}/create-checkout-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await resp.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        showGate(data.error || 'Could not start checkout. Please try again.');
+        gateStartBtn.disabled = false;
+        gateStartBtn.textContent = 'Start free trial';
+      }
+    } catch (err) {
+      showGate('Something went wrong. Please try again.');
+      gateStartBtn.disabled = false;
+      gateStartBtn.textContent = 'Start free trial';
+    }
+  }
+
+  gateStartBtn.addEventListener('click', () => {
+    const email = gateEmailInput.value.trim();
+    if (!email || !email.includes('@')) {
+      gateError.textContent = 'Please enter a valid email address.';
+      gateError.classList.add('show');
+      return;
+    }
+    gateError.classList.remove('show');
+    localStorage.setItem(EMAIL_KEY, email);
+    startTrial(email);
+  });
+
+  gateEmailInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') gateStartBtn.click();
+  });
+
+  manageSubBtn.addEventListener('click', async () => {
+    const email = localStorage.getItem(EMAIL_KEY);
+    if (!email) return;
+    try {
+      const resp = await fetch(`${WORKER_URL}/create-portal-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await resp.json();
+      if (data.url) window.location.href = data.url;
+    } catch (err) {
+      alert('Could not open subscription management. Please try again.');
+    }
+  });
+
+  async function init() {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session_id');
+
+    // Just returned from Stripe Checkout — verify the session and store the email.
+    if (sessionId) {
+      try {
+        const resp = await fetch(`${WORKER_URL}/verify-session?session_id=${encodeURIComponent(sessionId)}`);
+        const data = await resp.json();
+        if (data.email) {
+          localStorage.setItem(EMAIL_KEY, data.email);
+          // Clean the URL so refreshing doesn't re-trigger verification.
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      } catch (err) {
+        // Fall through — status check below will still run.
+      }
+    }
+
+    const email = localStorage.getItem(EMAIL_KEY);
+    if (!email) {
+      showGate();
+      return;
+    }
+
+    try {
+      const entitlement = await checkStatus(email);
+      if (entitlement.status === 'trialing' || entitlement.status === 'active') {
+        showApp(entitlement);
+      } else {
+        showGate('Your trial or subscription is no longer active. Start a new trial below.');
+        gateEmailInput.value = email;
+      }
+    } catch (err) {
+      showGate('Could not verify your account. Please check your connection and try again.');
+    }
+  }
+
+  init();
+})();
+</script>
+
+</body>
+</html>
