@@ -736,7 +736,7 @@ window.__initTrackerApp = function () {
     }
   }
 
-  gateStartBtn.addEventListener('click', () => {
+  gateStartBtn.addEventListener('click', async () => {
     const email = gateEmailInput.value.trim();
     if (!email || !email.includes('@')) {
       gateError.textContent = 'Please enter a valid email address.';
@@ -745,6 +745,25 @@ window.__initTrackerApp = function () {
     }
     gateError.classList.remove('show');
     localStorage.setItem(EMAIL_KEY, email);
+
+    gateStartBtn.disabled = true;
+    gateStartBtn.textContent = 'Checking...';
+
+    // If this email already has an active trial or subscription, unlock
+    // directly instead of sending them through checkout again.
+    try {
+      const entitlement = await checkStatus(email);
+      if (entitlement.status === 'trialing' || entitlement.status === 'active') {
+        showApp(entitlement);
+        return;
+      }
+    } catch (err) {
+      // If the status check fails, fall through to starting checkout —
+      // better to let a new user sign up than to block them entirely.
+    }
+
+    gateStartBtn.disabled = false;
+    gateStartBtn.textContent = 'Start free trial';
     startTrial(email);
   });
 
