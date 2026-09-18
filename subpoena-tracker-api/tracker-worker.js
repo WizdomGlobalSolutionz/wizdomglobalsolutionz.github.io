@@ -57,12 +57,17 @@ export default {
 // ---------------------------------------------------------------------------
 
 async function createCheckoutSession(request, env) {
-  const { email } = await request.json();
+  const { email, returnPath } = await request.json();
   if (!email || !email.includes('@')) {
     return jsonResponse({ error: 'A valid email is required.' }, 400);
   }
 
   const origin = request.headers.get('Origin') || ALLOWED_ORIGIN;
+
+  // The frontend tells us exactly where it lives (e.g. /subpoena-tracker-api/tracker.html).
+  // We don't rely on the Referer header for this — browsers strip the path from
+  // Referer on cross-origin requests by default, which silently broke this before.
+  const returnBase = returnPath ? `${origin}${returnPath}` : `${origin}/tracker.html`;
 
   const params = new URLSearchParams({
     mode: 'subscription',
@@ -70,8 +75,8 @@ async function createCheckoutSession(request, env) {
     'line_items[0][price]': env.STRIPE_PRICE_ID,
     'line_items[0][quantity]': '1',
     'subscription_data[trial_period_days]': String(TRIAL_DAYS),
-    success_url: `${origin}/tracker.html?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}/tracker.html`,
+    success_url: `${returnBase}?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: returnBase,
   });
 
   const resp = await stripeFetch('/v1/checkout/sessions', env, {
@@ -114,7 +119,7 @@ async function getStatus(url, env) {
 }
 
 async function createPortalSession(request, env) {
-  const { email } = await request.json();
+  const { email, returnPath } = await request.json();
   if (!email) return jsonResponse({ error: 'Email is required' }, 400);
 
   const raw = await env.TRACKER_KV.get(`entitlement:${email.toLowerCase().trim()}`);
@@ -122,10 +127,11 @@ async function createPortalSession(request, env) {
 
   const { customerId } = JSON.parse(raw);
   const origin = request.headers.get('Origin') || ALLOWED_ORIGIN;
+  const returnBase = returnPath ? `${origin}${returnPath}` : `${origin}/tracker.html`;
 
   const params = new URLSearchParams({
     customer: customerId,
-    return_url: `${origin}/tracker.html`,
+    return_url: returnBase,
   });
 
   const resp = await stripeFetch('/v1/billing_portal/sessions', env, {

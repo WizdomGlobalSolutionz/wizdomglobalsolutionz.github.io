@@ -719,7 +719,7 @@ window.__initTrackerApp = function () {
       const resp = await fetch(`${WORKER_URL}/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, returnPath: window.location.pathname }),
       });
       const data = await resp.json();
       if (data.url) {
@@ -759,7 +759,7 @@ window.__initTrackerApp = function () {
       const resp = await fetch(`${WORKER_URL}/create-portal-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, returnPath: window.location.pathname }),
       });
       const data = await resp.json();
       if (data.url) window.location.href = data.url;
