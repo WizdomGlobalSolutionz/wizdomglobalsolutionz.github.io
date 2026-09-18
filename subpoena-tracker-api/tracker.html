@@ -166,31 +166,6 @@
   #importPanel h3 { font-size: 15px; color: var(--ink); margin-bottom: 4px; }
   #importPanel .import-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 16px; }
 
-  .import-tabs {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 18px;
-    border-bottom: 1px solid var(--paper-line);
-  }
-  .import-tab {
-    padding: 8px 14px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--muted);
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-    background: none;
-    border-top: none;
-    border-left: none;
-    border-right: none;
-  }
-  .import-tab.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
-  }
-  .import-tab-panel { display: none; }
-  .import-tab-panel.active { display: block; }
-
   .dropzone {
     border: 1.5px dashed var(--paper-line);
     border-radius: 8px;
@@ -423,8 +398,6 @@
 </head>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <body>
 
   <div id="loadingScreen">Checking your account...</div>
@@ -538,31 +511,15 @@
 
         <div id="importPanel">
           <h3>Import records</h3>
-          <p class="import-sub">Bring in requests from a spreadsheet, or pull one from a subpoena/records-request document.</p>
+          <p class="import-sub">Bring in requests in bulk from a spreadsheet you already keep.</p>
 
-          <div class="import-tabs">
-            <button class="import-tab active" data-tab="spreadsheet">CSV / Excel (bulk)</button>
-            <button class="import-tab" data-tab="document">PDF / Word (single request)</button>
+          <div class="dropzone" id="spreadsheetDrop">
+            <div class="dz-main">Drop a CSV or Excel file here, or click to browse</div>
+            <p>Columns: Case Name, Type, Custodian, Method, Date Sent, Due Date, Notes<br>Type must be one of: Subpoena, Records request, or Deposition notice</p>
+            <input type="file" id="spreadsheetInput" accept=".csv,.xlsx,.xls" />
           </div>
-
-          <div class="import-tab-panel active" id="tabSpreadsheet">
-            <div class="dropzone" id="spreadsheetDrop">
-              <div class="dz-main">Drop a CSV or Excel file here, or click to browse</div>
-              <p>Columns: Case Name, Type, Custodian, Method, Date Sent, Due Date, Notes<br>Type must be one of: Subpoena, Records request, or Deposition notice</p>
-              <input type="file" id="spreadsheetInput" accept=".csv,.xlsx,.xls" />
-            </div>
-            <span class="template-link" id="downloadTemplateBtn">Download a blank template (.csv)</span>
-            <div class="import-status" id="spreadsheetStatus"></div>
-          </div>
-
-          <div class="import-tab-panel" id="tabDocument">
-            <div class="dropzone" id="documentDrop">
-              <div class="dz-main">Drop a PDF or Word file here, or click to browse</div>
-              <p>We'll pull out what we can find and let you review before saving</p>
-              <input type="file" id="documentInput" accept=".pdf,.docx" />
-            </div>
-            <div class="import-status" id="documentStatus"></div>
-          </div>
+          <span class="template-link" id="downloadTemplateBtn">Download a blank template (.csv)</span>
+          <div class="import-status" id="spreadsheetStatus"></div>
 
           <div class="form-actions">
             <button class="btn btn-ghost" id="cancelImportBtn">Close</button>
@@ -886,15 +843,6 @@ window.__initTrackerApp = function () {
     importPanel.classList.remove('open');
   });
 
-  document.querySelectorAll('.import-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.import-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.import-tab-panel').forEach(p => p.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById('tab' + tab.dataset.tab.charAt(0).toUpperCase() + tab.dataset.tab.slice(1)).classList.add('active');
-    });
-  });
-
   function setImportStatus(el, message, kind) {
     el.textContent = message;
     el.className = `import-status show ${kind}`;
@@ -1100,101 +1048,6 @@ window.__initTrackerApp = function () {
     a.click();
     URL.revokeObjectURL(url);
   });
-
-  // ---------- PDF / Word single-document import ----------
-
-  if (typeof pdfjsLib !== 'undefined') {
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  }
-
-  async function extractPdfText(file) {
-    const buffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
-    let text = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      text += content.items.map(it => it.str).join(' ') + '\n';
-    }
-    return text;
-  }
-
-  async function extractDocxText(file) {
-    const buffer = await file.arrayBuffer();
-    const result = await mammoth.extractRawText({ arrayBuffer: buffer });
-    return result.value;
-  }
-
-  function guessFieldsFromText(text) {
-    const guess = { caseName: '', type: 'Subpoena', custodian: '', sent: '', due: '', notes: '' };
-
-    // Case name: look for "X v. Y" or "Case No. ..." patterns.
-    const caseMatch = text.match(/([A-Z][A-Za-z.,'&\s]{2,60}\sv\.?\s[A-Z][A-Za-z.,'&\s]{2,60})/);
-    if (caseMatch) guess.caseName = caseMatch[1].trim();
-    const caseNoMatch = text.match(/Case\s*(?:No\.?|Number)?\s*[:#]?\s*([A-Za-z0-9\-]{4,20})/i);
-    if (!guess.caseName && caseNoMatch) guess.caseName = `Case No. ${caseNoMatch[1]}`;
-
-    // Request type from keywords.
-    if (/deposition/i.test(text)) guess.type = 'Deposition notice';
-    else if (/records?\s+request/i.test(text)) guess.type = 'Records request';
-    else if (/subpoena/i.test(text)) guess.type = 'Subpoena';
-
-    // Custodian: text following "To:" or "Custodian of Records".
-    const toMatch = text.match(/(?:To|Custodian of Records|Attn)\s*[:\-]\s*([A-Za-z0-9.,&'\s]{3,80})/i);
-    if (toMatch) guess.custodian = toMatch[1].trim().split('\n')[0];
-
-    // Any date-looking string becomes a candidate for "due"; we don't guess "sent"
-    // confidently from a single document, so leave it for the user to set.
-    const dateMatch = text.match(/\b(\d{1,2}\/\d{1,2}\/\d{2,4}|\w+\s+\d{1,2},\s*\d{4})\b/);
-    if (dateMatch) {
-      const parsed = parseDateLoose(dateMatch[1]);
-      if (parsed) guess.due = parsed;
-    }
-
-    guess.notes = 'Imported from document — please review all fields below before saving.';
-    return guess;
-  }
-
-  async function handleDocumentFile(file) {
-    const statusEl = document.getElementById('documentStatus');
-    const ext = file.name.split('.').pop().toLowerCase();
-    setImportStatus(statusEl, 'Reading document...', 'info');
-
-    try {
-      let text = '';
-      if (ext === 'pdf') {
-        if (typeof pdfjsLib === 'undefined') throw new Error('PDF reader failed to load.');
-        text = await extractPdfText(file);
-      } else if (ext === 'docx') {
-        if (typeof mammoth === 'undefined') throw new Error('Word reader failed to load.');
-        text = await extractDocxText(file);
-      } else {
-        setImportStatus(statusEl, 'Please upload a .pdf or .docx file.', 'error');
-        return;
-      }
-
-      const guess = guessFieldsFromText(text);
-
-      // Prefill the Add Request form and open it for review — we never save
-      // automatically, since extraction from a free-form document is a best
-      // guess, not a guarantee.
-      document.getElementById('fCase').value = guess.caseName;
-      document.getElementById('fType').value = guess.type;
-      document.getElementById('fCustodian').value = guess.custodian;
-      document.getElementById('fDue').value = guess.due;
-      document.getElementById('fNotes').value = guess.notes;
-
-      importPanel.classList.remove('open');
-      addPanel.classList.add('open');
-      setImportStatus(statusEl, 'Extracted what we could find — review it in the form above.', 'success');
-      window.scrollTo({ top: addPanel.offsetTop - 20, behavior: 'smooth' });
-    } catch (err) {
-      setImportStatus(statusEl, err.message || 'Could not read that document.', 'error');
-    }
-  }
-
-  setupDropzone('documentDrop', 'documentInput', handleDocumentFile);
 
   render();
 };
